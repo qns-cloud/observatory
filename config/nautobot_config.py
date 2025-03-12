@@ -1,7 +1,11 @@
 import os
 
-ALLOWED_HOSTS = ["*"]
+# More specific allowed hosts for security
+ALLOWED_HOSTS = ["nautobot", "localhost", "127.0.0.1"]
 DEBUG = False
+
+# Enable metrics for Prometheus
+METRICS_ENABLED = True
 
 DATABASES = {
     "default": {
@@ -17,7 +21,9 @@ DATABASES = {
 PLUGINS = ["nautobot_loki"]
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.BasicAuthentication"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
 }
-
-METRICS_ENABLED = False
