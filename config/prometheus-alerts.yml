@@ -47,6 +47,15 @@ groups:
           summary: "Loki is down"
           description: "Loki has been down for more than 5 minutes."
           
+      - alert: TelegrafDown
+        expr: 'up{job="telegraf"} == 0'
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Telegraf is down"
+          description: "Telegraf has been down for more than 5 minutes."
+          
   - name: resource-alerts
     interval: 1m
     rules:
@@ -76,3 +85,51 @@ groups:
         annotations:
           summary: "High disk usage"
           description: "Disk usage is above 85% for more than 10 minutes."
+          
+  - name: telegraf-alerts
+    interval: 1m
+    rules:
+      - alert: TelegrafHighCPUUsage
+        expr: 'cpu_usage_user{cpu="cpu-total"} + cpu_usage_system{cpu="cpu-total"} > 80'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage (Telegraf)"
+          description: "CPU usage is above 80% for more than 5 minutes (measured by Telegraf)."
+          
+      - alert: TelegrafHighMemoryUsage
+        expr: 'mem_used_percent > 85'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage (Telegraf)"
+          description: "Memory usage is above 85% for more than 5 minutes (measured by Telegraf)."
+          
+      - alert: TelegrafHighDiskUsage
+        expr: 'disk_used_percent{path="/"} > 85'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage (Telegraf)"
+          description: "Disk usage is above 85% for more than 5 minutes (measured by Telegraf)."
+          
+      - alert: TelegrafContainerHighCPU
+        expr: 'docker_container_cpu_usage_percent > 90'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Docker container {{ $labels.container_name }} CPU usage is above 90% for more than 5 minutes."
+          
+      - alert: TelegrafContainerHighMemory
+        expr: 'docker_container_mem_usage_percent > 90'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high memory usage"
+          description: "Docker container {{ $labels.container_name }} memory usage is above 90% for more than 5 minutes."

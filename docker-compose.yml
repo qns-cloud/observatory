@@ -172,6 +172,30 @@ services:
       retries: 3
     networks:
       - monitoring
+      
+  # --- Telegraf for Metrics Collection ---
+  telegraf:
+    image: telegraf:latest
+    volumes:
+      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "8125:8125/udp"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "telegraf", "--test"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - monitoring
 
   # --- Grafana for Visualization ---
   grafana:
