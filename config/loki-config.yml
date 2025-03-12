@@ -1,0 +1,10 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+limits_config:
+  retention_period: 30d

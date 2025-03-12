@@ -1,0 +1,11 @@
+groups:
+  - name: network-alerts
+    interval: 30s
+    rules:
+      - alert: NautobotDown
+        expr: 'up{job="nautobot"} == 0'
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          description: "Nautobot is not responding!"

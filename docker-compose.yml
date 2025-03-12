@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  # --- Nautobot for Network Automation ---
+  nautobot:
+    image: networktocode/nautobot:latest
+    deploy:
+      replicas: 1
+    volumes:
+      - ./config/nautobot_config.py:/opt/nautobot/nautobot_config.py
+      - ./config/nautobot_plugins.yml:/opt/nautobot/plugins.yml
+    environment:
+      - NAUTOBOT_DB_HOST=nautobot-db
+      - NAUTOBOT_DB_PORT=5432
+      - NAUTOBOT_DB_NAME=nautobot
+      - NAUTOBOT_DB_USER=nautobot
+      - NAUTOBOT_DB_PASSWORD=nautobot
+    networks:
+      - monitoring
+
+  nautobot-db:
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=nautobot
+      - POSTGRES_USER=nautobot
+      - POSTGRES_PASSWORD=nautobot
+    volumes:
+      - nautobot-db-data:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+    networks:
+      - monitoring
+
+  # --- Alertmanager ---
+  alertmanager:
+    image: prom/alertmanager:latest
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    deploy:
+      replicas: 1
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: overlay
+
+volumes:
+  nautobot-db-data:
+    driver: local
