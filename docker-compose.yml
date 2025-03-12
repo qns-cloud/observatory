@@ -20,7 +20,7 @@ services:
       - NAUTOBOT_DB_USER=nautobot
       - NAUTOBOT_DB_PASSWORD=nautobot
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       - nautobot-db
     healthcheck:
