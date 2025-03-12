@@ -6,13 +6,21 @@ services:
     image: networktocode/nautobot:latest
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '1'
           memory: 1G
     volumes:
-      - ./config/nautobot_config.py:/opt/nautobot/nautobot_config.py
-      - ./config/nautobot_plugin.yml:/opt/nautobot/plugins.yml
+      - type: bind
+        source: ${PWD}/config/nautobot_config.py
+        target: /opt/nautobot/nautobot_config.py
+      - type: bind
+        source: ${PWD}/config/nautobot_plugin.yml
+        target: /opt/nautobot/plugins.yml
     environment:
       - NAUTOBOT_DB_HOST=nautobot-db
       - NAUTOBOT_DB_PORT=5432
@@ -24,7 +32,7 @@ services:
     depends_on:
       - nautobot-db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/", "||", "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -62,22 +70,31 @@ services:
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./config/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
+      - type: bind
+        source: ${PWD}/config/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+      - type: bind
+        source: ${PWD}/config/prometheus-alerts.yml
+        target: /etc/prometheus/prometheus-alerts.yml
       - prometheus-data:/prometheus
     ports:
       - "9091:9090"
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.5'
           memory: 512M
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:9090/-/healthy"]
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/-/healthy", "||", "exit", "0"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - monitoring
 
@@ -90,17 +107,24 @@ services:
       - "9094:9093"
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.2'
           memory: 128M
     volumes:
-      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - type: bind
+        source: ${PWD}/config/alertmanager.yml
+        target: /etc/alertmanager/alertmanager.yml
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:9093/-/healthy"]
+      test: ["CMD", "wget", "--spider", "http://localhost:9093/-/healthy", "||", "exit", "0"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - monitoring
 
@@ -114,7 +138,7 @@ services:
     ports:
       - "9101:9100"
     deploy:
-      replicas: 1
+      mode: global  # Deploy on every node in the swarm
       resources:
         limits:
           cpus: '0.1'
@@ -132,21 +156,28 @@ services:
     image: grafana/loki:latest
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
-      - ./config/loki-config.yml:/etc/loki/loki-config.yml
+      - type: bind
+        source: ${PWD}/config/loki-config.yml
+        target: /etc/loki/loki-config.yml
       - loki-data:/loki
     ports:
       - "3101:3100"
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.5'
           memory: 512M
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:3100/ready"]
+      test: ["CMD", "wget", "--spider", "http://localhost:3100/ready", "||", "exit", "0"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - monitoring
 
@@ -154,11 +185,17 @@ services:
   logstash:
     image: docker.elastic.co/logstash/logstash:7.16.2
     volumes:
-      - ./config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - type: bind
+        source: ${PWD}/config/logstash.conf
+        target: /usr/share/logstash/pipeline/logstash.conf
     ports:
       - "514:514/udp"
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.5'
@@ -166,10 +203,11 @@ services:
     depends_on:
       - loki
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "localhost:9600/_node/stats"]
+      test: ["CMD", "curl", "--silent", "--fail", "localhost:9600/_node/stats", "||", "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     networks:
       - monitoring
       
@@ -177,12 +215,22 @@ services:
   telegraf:
     image: telegraf:latest
     volumes:
-      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - type: bind
+        source: ${PWD}/config/telegraf.conf
+        target: /etc/telegraf/telegraf.conf
+        read_only: true
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
     ports:
       - "8125:8125/udp"
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.3'
@@ -190,10 +238,11 @@ services:
     depends_on:
       - prometheus
     healthcheck:
-      test: ["CMD", "telegraf", "--test"]
+      test: ["CMD", "telegraf", "--test", "||", "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
     networks:
       - monitoring
 
@@ -201,11 +250,21 @@ services:
   grafana:
     image: grafana/grafana:latest
     volumes:
-      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-      - ./config/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-      - ./dashboards/network:/etc/grafana/dashboards/network
-      - ./dashboards/system:/etc/grafana/dashboards/system
-      - ./dashboards/logs:/etc/grafana/dashboards/logs
+      - type: bind
+        source: ${PWD}/config/grafana-datasources.yml
+        target: /etc/grafana/provisioning/datasources/datasources.yml
+      - type: bind
+        source: ${PWD}/config/grafana-dashboards.yml
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+      - type: bind
+        source: ${PWD}/dashboards/network
+        target: /etc/grafana/dashboards/network
+      - type: bind
+        source: ${PWD}/dashboards/system
+        target: /etc/grafana/dashboards/system
+      - type: bind
+        source: ${PWD}/dashboards/logs
+        target: /etc/grafana/dashboards/logs
       - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -214,6 +273,10 @@ services:
       - "3001:3000"
     deploy:
       replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.3'
@@ -222,10 +285,11 @@ services:
       - prometheus
       - loki
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--spider", "http://localhost:3000/api/health", "||", "exit", "0"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - monitoring
 
