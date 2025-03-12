@@ -13,9 +13,27 @@ DATABASES = {
         "NAME": os.getenv("NAUTOBOT_DB_NAME", "nautobot"),
         "USER": os.getenv("NAUTOBOT_DB_USER", "nautobot"),
         "PASSWORD": os.getenv("NAUTOBOT_DB_PASSWORD", "nautobot"),
-        "HOST": os.getenv("NAUTOBOT_DB_HOST", "nautobot-db"),
+        "HOST": os.getenv("NAUTOBOT_DB_HOST", "nautobot-postgres"),
         "PORT": os.getenv("NAUTOBOT_DB_PORT", "5432"),
     }
+}
+
+# Redis configuration
+REDIS = {
+    "tasks": {
+        "HOST": os.getenv("NAUTOBOT_REDIS_HOST", "nautobot-redis"),
+        "PORT": os.getenv("NAUTOBOT_REDIS_PORT", "6379"),
+        "PASSWORD": os.getenv("NAUTOBOT_REDIS_PASSWORD", "redis-password"),
+        "DATABASE": os.getenv("NAUTOBOT_REDIS_DATABASE", "0"),
+        "SSL": os.getenv("NAUTOBOT_REDIS_SSL", "False").lower() == "true",
+    },
+    "caching": {
+        "HOST": os.getenv("NAUTOBOT_REDIS_HOST", "nautobot-redis"),
+        "PORT": os.getenv("NAUTOBOT_REDIS_PORT", "6379"),
+        "PASSWORD": os.getenv("NAUTOBOT_REDIS_PASSWORD", "redis-password"),
+        "DATABASE": os.getenv("NAUTOBOT_REDIS_DATABASE", "1"),
+        "SSL": os.getenv("NAUTOBOT_REDIS_SSL", "False").lower() == "true",
+    },
 }
 
 PLUGINS = ["nautobot_loki"]

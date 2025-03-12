@@ -1,192 +1,145 @@
 version: "3.8"
 
+networks:
+  monitoring:
+    external: true
+    name: monitoring
+
+volumes:
+  nautobot_postgres_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+
 services:
-  # --- Nautobot for Network Automation ---
   nautobot:
+    container_name: nautobot
     image: networktocode/nautobot:latest
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+    ports:
+      - "8001:8000"
     volumes:
       - ./config/nautobot_config.py:/opt/nautobot/nautobot_config.py
       - ./config/nautobot_plugin.yml:/opt/nautobot/plugins.yml
-    environment:
-      - NAUTOBOT_DB_HOST=nautobot-db
-      - NAUTOBOT_DB_PORT=5432
-      - NAUTOBOT_DB_NAME=nautobot
-      - NAUTOBOT_DB_USER=nautobot
-      - NAUTOBOT_DB_PASSWORD=nautobot
-    ports:
-      - "8001:8000"
     depends_on:
-      - nautobot-db
+      - nautobot-postgres
+      - nautobot-redis
     networks:
       - monitoring
 
-  nautobot-db:
+  nautobot-redis:
+    container_name: nautobot-redis
+    image: redis:7.2-alpine
+    command:
+      - "sh"
+      - "-c"
+      - "redis-server --appendonly yes --requirepass redis-password"
+    networks:
+      - monitoring
+
+  nautobot-postgres:
+    container_name: nautobot-postgres
     image: postgres:14
     environment:
-      - POSTGRES_DB=nautobot
-      - POSTGRES_USER=nautobot
-      - POSTGRES_PASSWORD=nautobot
+      POSTGRES_USER: nautobot
+      POSTGRES_PASSWORD: nautobot
+      POSTGRES_DB: nautobot
     volumes:
-      - nautobot-db-data:/var/lib/postgresql/data
-    deploy:
-      replicas: 1
+      - nautobot_postgres_data:/var/lib/postgresql/data
     networks:
       - monitoring
 
-  # --- Prometheus for Metrics Collection ---
   prometheus:
+    container_name: prometheus
     image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
+      - --storage.tsdb.retention.size=512MB
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./config/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
-      - prometheus-data:/prometheus
-    ports:
-      - "9091:9090"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+      - prometheus_data:/prometheus
     networks:
       - monitoring
 
-  # --- Alertmanager ---
   alertmanager:
+    container_name: alertmanager
     image: prom/alertmanager:latest
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
     ports:
       - "9094:9093"
+    command: --config.file=/etc/alertmanager/alertmanager.yml --cluster.advertise-address=0.0.0.0:9093
     volumes:
       - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+      - alertmanager_data:/data
     networks:
       - monitoring
 
-  # --- Node Exporter for Host Metrics ---
   node-exporter:
+    container_name: node-exporter
     image: prom/node-exporter:latest
-    command:
-      - "--path.rootfs=/host"
-    volumes:
-      - /:/host:ro,rslave
     ports:
       - "9101:9100"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
     networks:
       - monitoring
 
-  # --- Loki for Log Aggregation ---
   loki:
+    container_name: loki
     image: grafana/loki:latest
+    ports:
+      - "3101:3100"
     command: -config.file=/etc/loki/loki-config.yml
     volumes:
       - ./config/loki-config.yml:/etc/loki/loki-config.yml
-      - loki-data:/loki
-    ports:
-      - "3101:3100"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+      - loki_data:/loki
     networks:
       - monitoring
 
-  # --- Logstash for Log Collection ---
   logstash:
-    image: docker.elastic.co/logstash/logstash:7.16.2
-    volumes:
-      - ./config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-    environment:
-      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+    container_name: logstash
+    image: grafana/logstash-output-loki:latest
     ports:
       - "514:514/udp"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+      - "12201:12201/udp"
+    command: -f /home/logstash/logstash.cfg
+    volumes:
+      - ./config/logstash.conf:/home/logstash/logstash.cfg
+    environment:
+      XPACK_MONITORING_ENABLED: "false"
     networks:
       - monitoring
-      
-  # --- Telegraf for Metrics Collection ---
+
   telegraf:
+    container_name: telegraf
     image: telegraf:latest
-    volumes:
-      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - HOST_PROC=/host/proc
-      - HOST_SYS=/host/sys
-      - HOST_ETC=/host/etc
     ports:
       - "8125:8125/udp"
       - "9273:9273"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+    command: telegraf --config /etc/telegraf/telegraf.conf
+    volumes:
+      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - monitoring
 
-  # --- Grafana for Visualization ---
   grafana:
+    container_name: grafana
     image: grafana/grafana:latest
-    volumes:
-      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-      - ./config/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-      - ./dashboards/network:/etc/grafana/dashboards/network
-      - ./dashboards/system:/etc/grafana/dashboards/system
-      - ./dashboards/logs:/etc/grafana/dashboards/logs
-      - grafana-data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
     ports:
       - "3001:3000"
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: any
-        delay: 5s
-        max_attempts: 3
+    volumes:
+      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/all.yml
+      - ./config/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/all.yml
+      - ./dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
     networks:
       - monitoring
-
-networks:
-  monitoring:
-    driver: overlay
-
-volumes:
-  nautobot-db-data:
-    driver: local
-  prometheus-data:
-    driver: local
-  loki-data:
-    driver: local
-  grafana-data:
-    driver: local
