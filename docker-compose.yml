@@ -200,6 +200,11 @@ services:
       - type: bind
         source: ${PWD}/config/logstash.conf
         target: /usr/share/logstash/pipeline/logstash.conf
+      - type: bind
+        source: ${PWD}/config
+        target: /usr/share/logstash/config
+    environment:
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
     ports:
       - "514:514/udp"
     deploy:
@@ -219,7 +224,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s
     networks:
       - monitoring
       
@@ -235,8 +240,13 @@ services:
         source: /var/run/docker.sock
         target: /var/run/docker.sock
         read_only: true
+    environment:
+      - HOST_PROC=/host/proc
+      - HOST_SYS=/host/sys
+      - HOST_ETC=/host/etc
     ports:
       - "8125:8125/udp"
+      - "9273:9273"
     deploy:
       replicas: 1
       restart_policy:
@@ -250,11 +260,11 @@ services:
     depends_on:
       - prometheus
     healthcheck:
-      test: ["CMD", "telegraf", "--test", "||", "exit", "0"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "telegraf", "--config", "/etc/telegraf/telegraf.conf", "--test", "||", "exit", "0"]
+      interval: 60s
+      timeout: 20s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     networks:
       - monitoring
 
