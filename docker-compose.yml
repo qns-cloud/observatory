@@ -133,6 +133,14 @@ services:
     image: prom/node-exporter:latest
     command:
       - "--path.rootfs=/host"
+      - "--web.max-requests=20"
+      - "--web.disable-exporter-metrics"
+      - "--collector.disable-defaults"
+      - "--collector.filesystem"
+      - "--collector.meminfo"
+      - "--collector.cpu"
+      - "--collector.netdev"
+      - "--collector.loadavg"
     volumes:
       - /:/host:ro,rslave
     ports:
@@ -148,10 +156,11 @@ services:
           cpus: '0.1'
           memory: 64M
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:9100/metrics"]
+      test: ["CMD", "wget", "--timeout=10", "--tries=1", "--spider", "http://localhost:9100/", "||", "exit", "0"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
+      start_period: 30s
     networks:
       - monitoring
 
