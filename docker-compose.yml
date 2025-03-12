@@ -138,7 +138,11 @@ services:
     ports:
       - "9101:9100"
     deploy:
-      mode: global  # Deploy on every node in the swarm
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
       resources:
         limits:
           cpus: '0.1'
