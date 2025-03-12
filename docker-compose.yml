@@ -2,8 +2,7 @@ version: "3.8"
 
 networks:
   monitoring:
-    external: true
-    name: monitoring
+    driver: overlay
 
 volumes:
   nautobot_postgres_data:
