@@ -77,15 +77,6 @@ groups:
           summary: "High memory usage"
           description: "Memory usage is above 85% for more than 10 minutes."
           
-      - alert: HighDiskUsage
-        expr: '100 - ((node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"}) > 85'
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High disk usage"
-          description: "Disk usage is above 85% for more than 10 minutes."
-          
   - name: telegraf-alerts
     interval: 1m
     rules:
