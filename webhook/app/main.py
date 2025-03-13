@@ -5,8 +5,8 @@ from logging.config import dictConfig
 
 import fastapi
 import uvicorn
-from app import config
-from app import api
+from webhook.app import config
+from webhook.app import api
 
 
 dictConfig(config.LogConfig().dict())

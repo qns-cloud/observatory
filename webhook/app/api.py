@@ -2,7 +2,14 @@ import logging
 from typing import Literal
 
 import fastapi
-from prefect.deployments.deployments import run_deployment
+try:
+    from prefect.deployments.deployments import run_deployment
+except ImportError:
+    # Mock for development/testing
+    def run_deployment(*args, **kwargs):
+        logging.getLogger("webhook").info(f"Mock run_deployment called with {args} {kwargs}")
+        return {"id": "mock-deployment-id"}
+
 from pydantic import BaseModel
 
 

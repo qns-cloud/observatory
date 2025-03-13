@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 from pydantic.error_wrappers import ValidationError
 
 SETTINGS = None
-ENV_FILE_PATH = Path(__file__) / ".." / ".." / ".." / ".env"
+ENV_FILE_PATH = Path(__file__).parent.parent.parent / ".env"
 
 
 class LogConfig(BaseModel):

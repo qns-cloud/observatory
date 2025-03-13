@@ -1,8 +1,7 @@
-version: "3.8"
+version: "3.3"
 
 networks:
   monitoring:
-    driver: bridge
 
 volumes:
   nautobot_postgres_data:
@@ -139,7 +138,10 @@ services:
       - "9997:9997"
     volumes:
       - ./webhook:/app
-    command: python -m app.main
+      - ./.env:/app/.env
+    command: >
+      bash -c "pip install -r /app/requirements.txt &&
+               python -m webhook.app.main"
     environment:
       PREFECT_API_URL: ${PREFECT_API_URL:-https://api.prefect.cloud/api/accounts/placeholder/workspaces/placeholder}
       PREFECT_API_KEY: ${PREFECT_API_KEY:-placeholder}
