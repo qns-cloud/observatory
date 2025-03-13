@@ -38,7 +38,7 @@ receivers:
 
   - name: 'webhook-notifications'
     webhook_configs:
-      - url: 'http://localhost:8080/webhook/network-alerts'
+      - url: 'http://webhook:9997/v1/api/webhook'
         send_resolved: true
 
 inhibit_rules:

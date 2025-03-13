@@ -2,7 +2,7 @@ version: "3.8"
 
 networks:
   monitoring:
-    driver: overlay
+    driver: bridge
 
 volumes:
   nautobot_postgres_data:
@@ -130,5 +130,18 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+    networks:
+      - monitoring
+      
+  webhook:
+    build:
+      context: ./webhook
+      dockerfile: webhook.Dockerfile
+    ports:
+      - "9997:9997"
+    command: python -m app.main
+    environment:
+      PREFECT_API_URL: ${PREFECT_API_URL:-https://api.prefect.cloud/api/accounts/placeholder/workspaces/placeholder}
+      PREFECT_API_KEY: ${PREFECT_API_KEY:-placeholder}
     networks:
       - monitoring
