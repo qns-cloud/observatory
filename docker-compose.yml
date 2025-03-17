@@ -47,6 +47,10 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.4
+    depends_on:
+      - prometheus
+      - loki
+      - alertmanager
     ports:
       - target: 3000
         published: 3000
@@ -79,6 +83,8 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.26.0
+    depends_on:
+      - prometheus
     ports:
       - target: 9093
         published: 9093
@@ -180,6 +186,8 @@ services:
   # Network monitoring components
   telegraf:
     image: ${TELEGRAF_IMAGE:-docker.io/telegraf:1.31}
+    depends_on:
+      - prometheus
     command: telegraf --config /etc/telegraf/telegraf.conf
     volumes:
       - ./config/telegraf.conf:/etc/telegraf/telegraf.conf
@@ -281,6 +289,8 @@ services:
   # Log aggregation components
   loki:
     image: grafana/loki:3.1.1
+    depends_on:
+      - prometheus
     ports:
       - target: 3001
         published: 3001
@@ -307,6 +317,8 @@ services:
 
   logstash:
     image: grafana/logstash-output-loki:3.1.1
+    depends_on:
+      - loki
     command: -f /home/logstash/logstash.cfg
     volumes:
       - ./config/logstash.conf:/home/logstash/logstash.cfg
@@ -343,6 +355,8 @@ services:
   # Custom components
   webhook:
     image: ${WEBHOOK_IMAGE:-observatory/webhook:latest}
+    depends_on:
+      - alertmanager
     command: python -m app.main
     ports:
       - target: 9997

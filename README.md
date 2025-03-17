@@ -117,6 +117,29 @@ Observatory is designed as a modular, containerized monitoring stack that can be
 
 The core components (Prometheus, Grafana, Alertmanager) provide the foundation for metrics collection, visualization, and alerting. Additional components extend the functionality to include network monitoring, log aggregation, and integration with external systems.
 
+### Service Dependencies and Startup Order
+
+The services in Observatory have dependencies on each other, which affects the order in which they start:
+
+1. **Core Services** (start first):
+   - Prometheus (metrics collection and storage)
+   - Node Exporter (host metrics)
+   - cAdvisor (container metrics)
+   - Nautobot databases (PostgreSQL and Redis)
+
+2. **Secondary Services** (depend on core services):
+   - Alertmanager (depends on Prometheus)
+   - Loki (depends on Prometheus for metrics export)
+   - Telegraf (depends on Prometheus for metrics export)
+   - Nautobot (depends on PostgreSQL and Redis)
+
+3. **Tertiary Services** (depend on secondary services):
+   - Grafana (depends on Prometheus, Loki, and Alertmanager)
+   - Logstash (depends on Loki)
+   - Webhook (depends on Alertmanager)
+
+These dependencies are defined in the docker-compose.yml file using the `depends_on` directive, which ensures that services start in the correct order.
+
 ### Docker Swarm Deployment Notes
 
 When deploying to Docker Swarm, keep in mind the following:
@@ -129,7 +152,11 @@ When deploying to Docker Swarm, keep in mind the following:
 
 4. Services with placement constraints (e.g., `node.role == manager`) will only run on manager nodes. Ensure you have enough manager nodes to handle these services.
 
-5. To label a node for monitoring (required by some placement constraints):
+5. The `depends_on` directive is respected in Docker Swarm, but it only affects the order in which services are created, not the order in which they become fully operational. For robust dependency handling, services should be designed to retry connections to their dependencies.
+
+6. Health checks are important for ensuring services are fully operational. While Docker Swarm supports health checks, they don't affect service startup order in the same way as in Docker Compose. The services in Observatory are configured to be resilient to temporary unavailability of their dependencies, but you may need to adjust timeouts or implement additional retry logic for your specific environment.
+
+7. To label a node for monitoring (required by some placement constraints):
    ```bash
    docker node update --label-add monitoring=true <node-id>
    ```
