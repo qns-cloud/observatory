@@ -1,0 +1,10 @@
+---
+name: nautobot_plugin_prometheus_sd
+description: Prometheus service discovery plugin for Nautobot
+version: 0.1.0
+author: Observatory
+author_email: observatory@example.com
+required_settings:
+  - prometheus_url
+default_settings:
+  prometheus_url: http://prometheus:9090

@@ -1,0 +1,55 @@
+---
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "grafana"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  - job_name: "node-exporter"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: "cadvisor"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: "telegraf"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["telegraf:9004"]
+
+  - job_name: "loki"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["loki:3001"]
+
+  - job_name: "nautobot"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["nautobot:8080"]
+
+  - job_name: "webhook"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["webhook:9997"]
+
+rule_files:
+  - /etc/prometheus/rules/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets:
+          - alertmanager:9093
+      timeout: 5s

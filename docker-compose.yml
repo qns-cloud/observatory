@@ -1,0 +1,355 @@
+version: "3.8"
+
+networks:
+  observatory-network:
+    driver: overlay
+    name: observatory-network
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  loki-data:
+  alertmanager-data:
+  nautobot-postgres-data:
+
+services:
+  # Core monitoring components
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    ports:
+      - target: 9090
+        published: 9090
+        protocol: tcp
+        mode: ingress
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-remote-write-receiver'
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus-alerts.yml:/etc/prometheus/rules/alerts.yml
+      - prometheus-data:/prometheus
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  grafana:
+    image: grafana/grafana:10.4.4
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/all.yml
+      - ./config/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/all.yml
+      - ./dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=natel-discrete-panel,fifemon-graphql-datasource,yesoreyeram-infinity-datasource,volkovlabs-echarts-panel
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    ports:
+      - target: 9093
+        published: 9093
+        protocol: tcp
+        mode: ingress
+    command: --config.file=/etc/alertmanager/alertmanager.yml --cluster.advertise-address=0.0.0.0:9093
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data:/data
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  node-exporter:
+    image: prom/node-exporter:v1.5.0
+    command:
+      - '--path.sysfs=/host/sys'
+      - '--path.procfs=/host/proc'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--no-collector.ipvs'
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    volumes:
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /host/sys
+        read_only: true
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    command: -logtostderr -docker_only
+    deploy:
+      mode: global
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    volumes:
+      - type: bind
+        source: /
+        target: /rootfs
+        read_only: true
+      - type: bind
+        source: /var/run
+        target: /var/run
+        read_only: true
+      - type: bind
+        source: /sys
+        target: /sys
+        read_only: true
+      - type: bind
+        source: /var/lib/docker
+        target: /var/lib/docker
+        read_only: true
+      - type: bind
+        source: /dev/disk
+        target: /dev/disk
+        read_only: true
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  # Network monitoring components
+  telegraf:
+    build:
+      context: .
+      dockerfile: ./webhook/webhook.Dockerfile
+      args:
+        TELEGRAF_IMAGE: telegraf:1.31
+    command: telegraf --config /etc/telegraf/telegraf.conf
+    volumes:
+      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf
+    ports:
+      - target: 9004
+        published: 9004
+        protocol: tcp
+        mode: ingress
+    environment:
+      - DEBUG=true
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  nautobot:
+    image: networktocode/nautobot:2.2-py3.10
+    ports:
+      - target: 8443
+        published: 8443
+        protocol: tcp
+        mode: ingress
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - ./config/nautobot_config.py:/opt/nautobot/nautobot_config.py
+      - ./config/nautobot_plugin.yml:/opt/nautobot/nautobot_plugin.yml
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    depends_on:
+      - nautobot-postgres
+      - nautobot-redis
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  nautobot-postgres:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=${NAUTOBOT_POSTGRES_USER:-nautobot}
+      - POSTGRES_PASSWORD=${NAUTOBOT_POSTGRES_PASSWORD:-nautobot}
+      - POSTGRES_DB=${NAUTOBOT_POSTGRES_DB:-nautobot}
+    volumes:
+      - nautobot-postgres-data:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  nautobot-redis:
+    image: redis:7.2-alpine
+    command:
+      - "sh"
+      - "-c"
+      - "redis-server --appendonly yes --requirepass ${NAUTOBOT_REDIS_PASSWORD:-nautobot}"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"
+
+  # Log aggregation components
+  loki:
+    image: grafana/loki:3.1.1
+    ports:
+      - target: 3001
+        published: 3001
+        protocol: tcp
+        mode: ingress
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/loki-config.yml
+      - loki-data:/loki
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+
+  logstash:
+    image: grafana/logstash-output-loki:3.1.1
+    command: -f /home/logstash/logstash.cfg
+    volumes:
+      - ./config/logstash.conf:/home/logstash/logstash.cfg
+    ports:
+      - target: 1515
+        published: 1515
+        protocol: tcp
+        mode: ingress
+      - target: 9600
+        published: 9600
+        protocol: tcp
+        mode: ingress
+      - target: 12201
+        published: 12201
+        protocol: udp
+        mode: ingress
+    environment:
+      - XPACK_MONITORING_ENABLED=false
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+
+  # Custom components
+  webhook:
+    build:
+      context: ./webhook
+      dockerfile: webhook.Dockerfile
+    command: python -m app.main
+    ports:
+      - target: 9997
+        published: 9997
+        protocol: tcp
+        mode: ingress
+    volumes:
+      - ./webhook:/app
+    environment:
+      - DEBUG=true
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - observatory-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://logstash:12201"

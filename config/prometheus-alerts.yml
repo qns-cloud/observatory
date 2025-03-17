@@ -1,0 +1,107 @@
+groups:
+  - name: node
+    rules:
+      - alert: HighCPULoad
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU load (instance {{ $labels.instance }})"
+          description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: HighMemoryLoad
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory load (instance {{ $labels.instance }})"
+          description: "Memory load is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage (instance {{ $labels.instance }})"
+          description: "Disk usage is > 85%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  - name: containers
+    rules:
+      - alert: ContainerHighCPUUsage
+        expr: (sum by(name) (rate(container_cpu_usage_seconds_total[5m])) / count by(name) (container_cpu_usage_seconds_total)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high CPU usage (instance {{ $labels.instance }})"
+          description: "Container CPU usage is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: ContainerHighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high memory usage (instance {{ $labels.instance }})"
+          description: "Container memory usage is > 80%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  - name: network
+    rules:
+      - alert: NetworkDeviceDown
+        expr: up{job="telegraf"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Network device down (instance {{ $labels.instance }})"
+          description: "Network device is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: InterfaceDown
+        expr: interface_oper_status{oper_status="2"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Interface down (instance {{ $labels.instance }})"
+          description: "Interface {{ $labels.name }} is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: BGPSessionDown
+        expr: bgp_neighbor_state{neighbor_state="2"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BGP session down (instance {{ $labels.instance }})"
+          description: "BGP session with {{ $labels.neighbor }} is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: OSPFNeighborDown
+        expr: ospf_neighbor_state{neighbor_state="2"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OSPF neighbor down (instance {{ $labels.instance }})"
+          description: "OSPF neighbor {{ $labels.neighbor }} is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  - name: services
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service down (instance {{ $labels.instance }})"
+          description: "Service {{ $labels.job }} is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: HighHTTPResponseTime
+        expr: http_response_time_seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP response time (instance {{ $labels.instance }})"
+          description: "HTTP response time is > 1s\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
