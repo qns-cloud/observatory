@@ -40,9 +40,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   grafana:
     image: grafana/grafana:10.4.4
@@ -71,9 +72,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   alertmanager:
     image: prom/alertmanager:v0.26.0
@@ -96,9 +98,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   node-exporter:
     image: prom/node-exporter:v1.5.0
@@ -130,9 +133,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.47.0
@@ -168,17 +172,14 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   # Network monitoring components
   telegraf:
-    build:
-      context: .
-      dockerfile: ./webhook/webhook.Dockerfile
-      args:
-        TELEGRAF_IMAGE: telegraf:1.31
+    image: ${TELEGRAF_IMAGE:-docker.io/telegraf:1.31}
     command: telegraf --config /etc/telegraf/telegraf.conf
     volumes:
       - ./config/telegraf.conf:/etc/telegraf/telegraf.conf
@@ -196,9 +197,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   nautobot:
     image: networktocode/nautobot:2.2-py3.10
@@ -227,9 +229,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   nautobot-postgres:
     image: postgres:14
@@ -249,9 +252,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   nautobot-redis:
     image: redis:7.2-alpine
@@ -269,9 +273,10 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"
 
   # Log aggregation components
   loki:
@@ -294,6 +299,11 @@ services:
           - node.role == manager
     networks:
       - observatory-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   logstash:
     image: grafana/logstash-output-loki:3.1.1
@@ -324,22 +334,28 @@ services:
           - node.role == manager
     networks:
       - observatory-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Custom components
   webhook:
-    build:
-      context: ./webhook
-      dockerfile: webhook.Dockerfile
+    image: ${WEBHOOK_IMAGE:-observatory/webhook:latest}
     command: python -m app.main
     ports:
       - target: 9997
         published: 9997
         protocol: tcp
         mode: ingress
-    volumes:
-      - ./webhook:/app
     environment:
-      - DEBUG=true
+      - DEBUG=${DEBUG:-false}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL}
+      - PAGERDUTY_ROUTING_KEY=${PAGERDUTY_ROUTING_KEY}
+      - PREFECT_API_URL=${PREFECT_API_URL}
+      - PREFECT_API_KEY=${PREFECT_API_KEY}
     deploy:
       replicas: 1
       restart_policy:
@@ -350,6 +366,7 @@ services:
     networks:
       - observatory-network
     logging:
-      driver: gelf
+      driver: "json-file"
       options:
-        gelf-address: "udp://logstash:12201"
+        max-size: "10m"
+        max-file: "3"

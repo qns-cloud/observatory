@@ -62,10 +62,28 @@ TEAMS_WEBHOOK_URL=https://your-tenant.webhook.office.com/webhookb2/your/teams/we
 PAGERDUTY_ROUTING_KEY=your-pagerduty-routing-key
 ```
 
-3. Start the services:
+3. Build and push the webhook image (required for Docker Swarm deployment):
 
 ```bash
+# Build the webhook image
+docker build -t observatory/webhook:latest -f webhook/webhook.Dockerfile webhook/
+
+# If deploying to a Docker Swarm cluster with multiple nodes, push the image to a registry
+# docker tag observatory/webhook:latest your-registry.com/observatory/webhook:latest
+# docker push your-registry.com/observatory/webhook:latest
+# Then update the WEBHOOK_IMAGE in .env to your-registry.com/observatory/webhook:latest
+```
+
+4. Start the services:
+
+For Docker Compose:
+```bash
 docker-compose up -d
+```
+
+For Docker Swarm:
+```bash
+docker stack deploy -c docker-compose.yml observatory
 ```
 
 4. Access the services:
@@ -98,6 +116,23 @@ Edit the `.env` file to configure external integrations like Slack, Microsoft Te
 Observatory is designed as a modular, containerized monitoring stack that can be deployed on a single host or across a Docker Swarm cluster.
 
 The core components (Prometheus, Grafana, Alertmanager) provide the foundation for metrics collection, visualization, and alerting. Additional components extend the functionality to include network monitoring, log aggregation, and integration with external systems.
+
+### Docker Swarm Deployment Notes
+
+When deploying to Docker Swarm, keep in mind the following:
+
+1. All images must be available to all nodes in the Swarm. Either use images from public registries or push your custom images to a private registry accessible by all nodes.
+
+2. The `build` directive is not supported in Docker Swarm mode. All services must use pre-built images.
+
+3. Volumes are not automatically shared between nodes. For production deployments, consider using a shared storage solution or deploying stateful services with placement constraints.
+
+4. Services with placement constraints (e.g., `node.role == manager`) will only run on manager nodes. Ensure you have enough manager nodes to handle these services.
+
+5. To label a node for monitoring (required by some placement constraints):
+   ```bash
+   docker node update --label-add monitoring=true <node-id>
+   ```
 
 ## License
 
