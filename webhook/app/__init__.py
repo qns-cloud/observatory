@@ -1,1 +1,0 @@
-"""Webhook app package."""

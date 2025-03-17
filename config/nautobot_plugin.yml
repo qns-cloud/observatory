@@ -1,4 +1,0 @@
-plugins:
-  nautobot_loki:
-    loki_url: "http://loki:3100"
-    default_query_timeframe: "7d"
